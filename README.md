@@ -18,7 +18,7 @@
 ## 🔥 News
 
 - **[2026.07]** 🎉 Paper accepted at **ICML 2026** (Seoul, South Korea)!
-- **[2026.05]** Code and pre-trained models released.
+- **[2026.05]** Code released.
 
 ---
 

@@ -1,0 +1,39 @@
+# AGREE 配置文件（HKD-IAA版本） - AADB数据集
+
+version: 'HKD-IAA-AGREE-AADB'
+saga_version: 'v2'
+
+# 敏感度CSV路径（AADB数据集）
+sensitivity_csv_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/DataCategories/Classified_statistic_AADB/attribute_class/attribute_sensitivity_class_all.csv'
+
+# v3版本的多任务学习参数
+sensitivity_alpha: 0.2  # 敏感度损失权重（仅v3使用）
+
+# 模型参数
+visual_dim: 256
+text_dim: 4096
+
+# 训练参数
+batch_size: 4
+num_epochs: 100
+learning_rate: 0.00001
+weight_decay: 0.0001
+
+# ========== AGREE：误差感知加权（不引入HMAI指标） ==========
+error_aware:
+  enabled: true
+  beta: 1.0
+  tau: 0.1
+  warmup_epochs: 5
+  ema_decay: 0.9
+
+# 数据路径 (AADB)
+data_root: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AADB'
+images_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AADB/images/'
+csv_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AADB/datasets/'
+text_features_dir: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AADB/text_features/'
+
+# 日志和保存
+log_dir: 'Logs'
+checkpoint_dir: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/CheckPoints/MyWork/AADB/HKD-IAA-AGREE/'
+save_freq: 5

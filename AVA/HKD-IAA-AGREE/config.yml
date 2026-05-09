@@ -1,0 +1,39 @@
+# AGREE 配置文件（HKD-IAA版本） - AVA数据集
+
+version: 'HKD-IAA-AGREE-AVA'
+saga_version: 'v2'
+
+# 敏感度CSV路径（AVA数据集）
+sensitivity_csv_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/DataCategories/Classified_statistic_AVA/attribute_class/attribute_sensitivity_class_all.csv'
+
+# v3版本的多任务学习参数
+sensitivity_alpha: 0.2  # 敏感度损失权重（仅v3使用）
+
+# 模型参数
+visual_dim: 256
+text_dim: 4096
+
+# 训练参数
+batch_size: 4
+num_epochs: 100
+learning_rate: 0.00001
+weight_decay: 0.0001
+
+# ========== AGREE：误差感知加权（不引入HMAI指标） ==========
+error_aware:
+  enabled: true           # 是否启用误差感知加权
+  beta: 1.0               # 权重强度，控制最大额外权重
+  tau: 0.1                # 温度参数，控制权重增长敏感度
+  warmup_epochs: 5        # 预热轮数，前N轮不使用误差加权
+  ema_decay: 0.9          # 历史误差EMA衰减系数
+
+# 数据路径 (AVA)
+data_root: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AVA'
+images_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AVA/AVA_dataset/image/'
+csv_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AVA/AVA_dataset/AVAdata/'
+text_features_dir: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AVA/AVA_dataset/text_features/'
+
+# 日志和保存
+log_dir: 'Logs'
+checkpoint_dir: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/CheckPoints/MyWork/AVA/HKD-IAA-AGREE/'
+save_freq: 5

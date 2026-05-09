@@ -1,0 +1,43 @@
+# AGREE 配置文件（EAMB-Net + AGREE） - AADB数据集
+# 
+# AGREE: Attribute-aware Gradient conflict REduction for aEsthetics
+# 论文组件:
+#   - Sensitivity-guided Routing: 公式(5)(6)(7)(8)
+#   - Error-Aware Reweighting (EA-MSE): 公式(10)(11)(12)
+
+version: 'EAMB-AGREE-AADB'
+
+# 敏感度CSV路径 - 用于 Sensitivity-guided Routing
+sensitivity_csv_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/DataCategories/Classified_statistic_AADB/attribute_class/attribute_sensitivity_class_all.csv'
+
+# 模型参数
+visual_dim: 256
+text_dim: 4096
+target_feature_size: 14
+mobilenet_pretrained: false
+
+# 训练参数
+batch_size: 8
+num_epochs: 100
+learning_rate: 0.0001
+weight_decay: 0.00001
+
+# ========== AGREE: Error-Aware Reweighting (EA-MSE) ==========
+# 对应论文公式(10)(11)(12)
+error_aware:
+  enabled: true
+  beta: 1.0       # 公式(11): ω_i = 1 + β * tanh(...)
+  tau: 0.1        # 公式(11): (e_i - μ_g) / (τ * σ_g)
+  warmup_epochs: 5
+  ema_decay: 0.9  # 公式(10): γ = 0.9
+
+# 数据路径 (AADB)
+data_root: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AADB'
+images_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AADB/images/'
+csv_path: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AADB/datasets/'
+text_features_dir: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/IAADatasets/AADB/text_features/'
+
+# 日志和保存
+log_dir: 'Logs'
+checkpoint_dir: '/home/dmc/12TB_ZHZ68JLF/A_PROJECT_IAA/CheckPoints/MyWork/AADB/EAMB-Net-AGREE/'
+save_freq: 5

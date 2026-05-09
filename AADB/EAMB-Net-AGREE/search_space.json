@@ -1,0 +1,8 @@
+{
+    "batch_size": {"_type":"choice", "_value": [8, 16]},
+    "init_lr":{"_type":"choice","_value":[0.00003, 0.00001]},
+    "init_lr_emotion":{"_type":"choice","_value":[0.000001]},
+    "init_lr_visual":{"_type":"choice","_value":[0.00001, 0.000003]},
+    "init_lr_fusion":{"_type":"choice","_value":[0.00001, 0.000003]},
+    "init_lr_head":{"_type":"choice","_value":[0.0001, 0.00003]}
+}

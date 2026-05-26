@@ -19,6 +19,7 @@
 
 - **[2026.07]** 🎉 Paper accepted at **ICML 2026** (Seoul, South Korea)!
 - **[2026.05]** Code released.
+- **[2026.05]** 🌐 [Project page](https://dahat364.github.io/AGREE/) is online!
 
 ---
 

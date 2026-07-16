@@ -8,9 +8,12 @@ from tqdm import tqdm
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error
 from scipy.stats import spearmanr, pearsonr
 
+import pandas as pd
+from torchvision import transforms
+from torchvision.datasets.folder import default_loader
+
 import option
 from models.EAMBNet_AGREE import EAMBNet_AGREE
-from multimodal_dataset import MultimodalAVADataset
 
 
 def load_config(config_path='config.yml'):
@@ -36,20 +39,34 @@ if CONFIG_CKPT_DIR:
 print(f"{'='*80}\n")
 
 
-def _prepare_batch(batch, device):
-    """准备批次数据"""
-    (x, y,
-     brightness_attr, contrast_attr, saturation_attr, hue_attr, blur_attr,
-     overall_text, brightness_text, contrast_text, saturation_text, hue_text, blur_text,
-     image_ids) = batch
+IMAGE_NET_MEAN = [0.485, 0.456, 0.406]
+IMAGE_NET_STD = [0.229, 0.224, 0.225]
 
-    x = x.to(device)
-    y = y.to(device).view(y.size(0), -1).float()
-    attr_tensors = [brightness_attr, contrast_attr, saturation_attr, hue_attr, blur_attr]
-    attr_tensors = [t.to(device) for t in attr_tensors]
-    text_tensors = [overall_text, brightness_text, contrast_text, saturation_text, hue_text, blur_text]
-    text_tensors = [t.to(device).float() for t in text_tensors]
-    return x, y, attr_tensors, text_tensors, image_ids
+
+class ImageOnlyDataset(torch.utils.data.Dataset):
+    def __init__(self, path_to_csv, images_path):
+        self.df = pd.read_csv(path_to_csv)
+        self.images_path = images_path
+        self.transform = transforms.Compose([
+            transforms.Resize((512, 512)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGE_NET_MEAN, std=IMAGE_NET_STD)
+        ])
+
+    def __len__(self):
+        return self.df.shape[0]
+
+    def __getitem__(self, item):
+        row = self.df.iloc[item]
+        score_columns = ['score2', 'score3', 'score4', 'score5', 'score6',
+                        'score7', 'score8', 'score9', 'score10', 'score11']
+        scores = row[score_columns].values.astype('float32')
+        y = scores / (scores.sum() + 1e-8)
+        image_id = str(row['image_id'])
+        image_path = os.path.join(self.images_path, image_id)
+        image = default_loader(image_path)
+        x = self.transform(image)
+        return x, y.astype('float32'), image_id
 
 
 def get_ava_score(y_pred, device):
@@ -62,14 +79,8 @@ def get_ava_score(y_pred, device):
     return score
 
 def create_test_loader(opt):
-    """创建测试数据加载器"""
     test_csv_path = os.path.join(opt['path_to_save_csv'], 'test.csv')
-    dataset = MultimodalAVADataset(
-        test_csv_path,
-        opt['path_to_images'],
-        opt['path_to_text_features'],
-        if_train=False
-    )
+    dataset = ImageOnlyDataset(test_csv_path, opt['path_to_images'])
     return torch.utils.data.DataLoader(
         dataset,
         batch_size=opt['batch_size'],
@@ -79,40 +90,39 @@ def create_test_loader(opt):
 
 
 def evaluate(model, loader, criterion, device):
-    """评估模型"""
     model.eval()
     pred_scores, true_scores, losses = [], [], []
 
     with torch.no_grad():
         for batch in tqdm(loader):
-            x, y, attr_tensors, text_tensors, image_ids = _prepare_batch(batch, device)
-            (brightness_attr, contrast_attr, saturation_attr, hue_attr, blur_attr) = attr_tensors
-            (overall_text, brightness_text, contrast_text, saturation_text, hue_text, blur_text) = text_tensors
+            x, y, image_ids = batch
+            x = x.to(device)
+            y = y.to(device).view(y.size(0), -1).float()
 
-            # 根据版本调用模型
+            B = x.size(0)
+            dummy_attr = x
+            dummy_text = torch.zeros(B, 4096, device=device)
+            dummy_ids = [f"__img_only_{i:06d}" for i in range(B)]
+
             if SAGA_VERSION == 'v3':
-                # v3版本返回两个输出
                 y_pred, pred_sensitivity = model(
                     x,
-                    brightness_attr, contrast_attr, saturation_attr, hue_attr, blur_attr,
-                    overall_text, brightness_text, contrast_text, saturation_text, hue_text, blur_text,
-                    image_ids=image_ids,
+                    dummy_attr, dummy_attr, dummy_attr, dummy_attr, dummy_attr,
+                    dummy_text, dummy_text, dummy_text, dummy_text, dummy_text, dummy_text,
+                    image_ids=dummy_ids,
                     return_sensitivity=True
                 )
             else:
-                # v1和v2版本只返回美学分数
                 y_pred = model(
                     x,
-                    brightness_attr, contrast_attr, saturation_attr, hue_attr, blur_attr,
-                    overall_text, brightness_text, contrast_text, saturation_text, hue_text, blur_text,
-                    image_ids=image_ids
+                    dummy_attr, dummy_attr, dummy_attr, dummy_attr, dummy_attr,
+                    dummy_text, dummy_text, dummy_text, dummy_text, dummy_text, dummy_text,
+                    image_ids=dummy_ids
                 )
 
-            # 测试时只使用美学分数
             loss = criterion(y_pred, y)
             losses.append(loss.item())
 
-            # AVA评分计算：加权求和 (1-10)
             pred_score_values = get_ava_score(y_pred, device)
             true_score_values = get_ava_score(y, device)
             pred_scores += pred_score_values.cpu().numpy().tolist()
@@ -126,7 +136,6 @@ def evaluate(model, loader, criterion, device):
     mae = mean_absolute_error(true_scores, pred_scores)
     mse = mean_squared_error(true_scores, pred_scores)
     rmse = np.sqrt(mse)
-    # AVA准确率阈值：5.5分
     acc = accuracy_score(
         (true_scores > 5.5).astype(int),
         (pred_scores > 5.5).astype(int)
@@ -166,7 +175,7 @@ def run_test(opt, ckpt_path=None):
     
     model = EAMBNet_AGREE(
         saga_version=SAGA_VERSION,
-        sensitivity_csv_path=SENSITIVITY_CSV_PATH,
+        sensitivity_csv_path=None,
         dataset='AVA'  # 指定AVA数据集
     ).to(device)
     

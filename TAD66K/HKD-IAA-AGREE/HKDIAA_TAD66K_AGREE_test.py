@@ -4,14 +4,43 @@ from tqdm import tqdm
 import torch
 import numpy as np
 import yaml
+import pandas as pd
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error
 from scipy.stats import pearsonr, spearmanr
+from torch.utils.data import Dataset
+from torchvision import transforms
+from torchvision.datasets.folder import default_loader
 
 import option
 from models.HKD_Fusion import HKDFusion
-from multimodal_dataset import MultimodalTAD66KDataset
 
 warnings.filterwarnings('ignore')
+
+IMAGE_NET_MEAN = [0.485, 0.456, 0.406]
+IMAGE_NET_STD = [0.229, 0.224, 0.225]
+
+
+class ImageOnlyDataset(Dataset):
+    def __init__(self, path_to_csv, images_path):
+        self.df = pd.read_csv(path_to_csv)
+        self.images_path = images_path
+        self.transform = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGE_NET_MEAN, std=IMAGE_NET_STD)
+        ])
+
+    def __len__(self):
+        return self.df.shape[0]
+
+    def __getitem__(self, item):
+        row = self.df.iloc[item]
+        y = np.array([row['score'] / 10])
+        image_id = row['image']
+        image_path = os.path.join(self.images_path, image_id)
+        image = default_loader(image_path)
+        x = self.transform(image)
+        return (x, y.astype('float32'), image_id)
 
 
 def load_config(config_path='config.yml'):
@@ -50,29 +79,20 @@ def validate(opt, model, loader, criterion, device):
 
     with torch.no_grad():
         for batch in tqdm(loader):
-            (x, y,
-             brightness_attr, contrast_attr, saturation_attr, hue_attr, blur_attr,
-             overall_text, brightness_text, contrast_text, saturation_text, hue_text, blur_text, image_id_clean) = batch
+            x, y, image_ids = batch
 
             x = x.to(device)
             y = y.type(torch.FloatTensor).to(device)
-            brightness_attr = brightness_attr.to(device)
-            contrast_attr = contrast_attr.to(device)
-            saturation_attr = saturation_attr.to(device)
-            hue_attr = hue_attr.to(device)
-            blur_attr = blur_attr.to(device)
 
-            overall_text = _fix_text_feature_dim(overall_text, device)
-            brightness_text = _fix_text_feature_dim(brightness_text, device)
-            contrast_text = _fix_text_feature_dim(contrast_text, device)
-            saturation_text = _fix_text_feature_dim(saturation_text, device)
-            hue_text = _fix_text_feature_dim(hue_text, device)
-            blur_text = _fix_text_feature_dim(blur_text, device)
+            B = x.size(0)
+            dummy_attr = x
+            dummy_text = torch.zeros(B, 4096, device=device)
+            dummy_ids = [f"__img_only_{i:06d}" for i in range(B)]
 
             y_pred = model(
-                x, brightness_attr, contrast_attr, saturation_attr, hue_attr, blur_attr,
-                overall_text, brightness_text, contrast_text, saturation_text, hue_text, blur_text,
-                image_ids=image_id_clean
+                x, dummy_attr, dummy_attr, dummy_attr, dummy_attr, dummy_attr,
+                dummy_text, dummy_text, dummy_text, dummy_text, dummy_text, dummy_text,
+                image_ids=dummy_ids
             )
 
             pscore_np = y_pred.data.cpu().numpy().astype('float')
@@ -106,13 +126,10 @@ def validate(opt, model, loader, criterion, device):
 def load_test_loader(opt):
     csv_root = opt.path_to_PARA_save_csv
     images_path = opt.path_to_PARA_images
-    text_root = opt.path_to_text_features
 
-    test_dataset = MultimodalTAD66KDataset(
+    test_dataset = ImageOnlyDataset(
         os.path.join(csv_root, 'test.csv'),
-        images_path,
-        text_root,
-        if_train=False
+        images_path
     )
 
     test_loader = torch.utils.data.DataLoader(
@@ -133,7 +150,7 @@ def load_model_and_test(opt, ckpt_path):
         target_feature_size=14,
         visual_dim=256,
         saga_version=SAGA_VERSION,
-        sensitivity_csv_path=SENSITIVITY_CSV_PATH
+        sensitivity_csv_path=None
     ).to(device)
 
     checkpoint = torch.load(ckpt_path, map_location=device)
@@ -159,7 +176,7 @@ if __name__ == "__main__":
     # 批量测试（根据需要修改路径）
     checkpoint_dir = CONFIG_CKPT_DIR or opt.path_to_save_ckpt
     print(f"📁 扫描checkpoint目录: {checkpoint_dir}")
-    
+
     if os.path.exists(checkpoint_dir):
         ckpts = sorted([f for f in os.listdir(checkpoint_dir) if f.endswith('.pth')])
         if ckpts:

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <b>AGREE</b> (<b>A</b>ttribute-aware <b>G</b>radient conflict <b>RE</b>duction for a<b>E</b>sthetics) is a plug-and-play framework that addresses gradient conflict in Image Aesthetic Assessment (IAA) through attribute-aware decoupling and sensitivity-guided routing.
+  <b>AGREE</b> (<b>A</b>ttribute-aware <b>G</b>radient <b>R</b>outing for <b>E</b>stablishing agr<b>E</b>ement) is a plug-and-play framework that addresses gradient conflict in Image Aesthetic Assessment (IAA) through attribute-aware decoupling and sensitivity-guided routing.
 </p>
 
 ---
